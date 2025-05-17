@@ -1,0 +1,5 @@
+# Ignore database backup files
+/backups/*.sql
+
+# But keep the backups directory
+!/backups/.gitkeep 
