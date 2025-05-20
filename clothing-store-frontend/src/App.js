@@ -22,9 +22,9 @@ import AdminOrders from './pages/AdminOrders';
 import AdminUsers from './pages/AdminUsers';
 import AdminSettings from './pages/AdminSettings';
 
-// Components
-import Header from './components/Header';
-import AdminHeader from './components/AdminHeader';
+// Layouts
+import PublicLayout from './layouts/PublicLayout';
+import AdminLayout from './layouts/AdminLayout';
 
 // Context Providers
 import { UserProvider } from './context/UserContext';
@@ -33,23 +33,14 @@ import { NotificationProvider } from './context/NotificationContext';
 import { SettingsProvider } from './context/SettingsContext';
 
 function App() {
-  // Clean up old cart storage format on application start
   useEffect(() => {
     console.log('App initialization - Checking for legacy cart data');
-    
-    // Remove the old cart storage key if it exists
     if (localStorage.getItem('cart')) {
       console.log('Found legacy cart data, removing it');
       localStorage.removeItem('cart');
     }
-    
-    // Log all localStorage keys for debugging
-    const storageKeys = Object.keys(localStorage);
-    console.log('All localStorage keys on startup:', storageKeys);
+    console.log('All localStorage keys on startup:', Object.keys(localStorage));
   }, []);
-  
-  // Debug notification rendering
-  console.log('App component rendering');
 
   return (
     <Router>
@@ -59,44 +50,30 @@ function App() {
             <SettingsProvider>
               <div className="App">
                 <Routes>
-                  {/* Admin Routes */}
-                  <Route path="/admin/*" element={
-                    <>
-                      <AdminHeader />
-                      <main>
-                        <Routes>
-                          <Route path="/" element={<AdminLanding />} />
-                          <Route path="/landing" element={<AdminLanding />} />
-                          <Route path="/dashboard" element={<AdminDashboard />} />
-                          <Route path="/products" element={<AdminProducts />} />
-                          <Route path="/orders" element={<AdminOrders />} />
-                          <Route path="/users" element={<AdminUsers />} />
-                          <Route path="/settings" element={<AdminSettings />} />
-                        </Routes>
-                      </main>
-                    </>
-                  } />
-                  
-                  {/* Public Routes */}
-                  <Route path="/*" element={
-                    <>
-                      <Header />
-                      <main>
-                        <Routes>
-                          <Route index element={<HomePage />} />
-                          <Route path="/shop" element={<ShopPage />} />
-                          <Route path="/product/:id" element={<ProductDetailPage />} />
-                          <Route path="/cart" element={<CartPage />} />
-                          <Route path="/checkout" element={<CheckoutPage />} />
-                          <Route path="/login" element={<LoginPage />} />
-                          <Route path="/register" element={<RegisterPage />} />
-                          <Route path="/orders" element={<OrderHistory />} />
-                          <Route path="/order/:id" element={<OrderDetail />} />
-                          <Route path="/profile" element={<UserProfile />} />
-                        </Routes>
-                      </main>
-                    </>
-                  } />
+                  {/* Admin Layout */}
+                  <Route path="/admin" element={<AdminLayout />}>
+                    <Route index element={<AdminLanding />} />
+                    <Route path="landing" element={<AdminLanding />} />
+                    <Route path="dashboard" element={<AdminDashboard />} />
+                    <Route path="products" element={<AdminProducts />} />
+                    <Route path="orders" element={<AdminOrders />} />
+                    <Route path="users" element={<AdminUsers />} />
+                    <Route path="settings" element={<AdminSettings />} />
+                  </Route>
+
+                  {/* Public Layout */}
+                  <Route path="/" element={<PublicLayout />}>
+                    <Route index element={<HomePage />} />
+                    <Route path="shop" element={<ShopPage />} />
+                    <Route path="product/:id" element={<ProductDetailPage />} />
+                    <Route path="cart" element={<CartPage />} />
+                    <Route path="checkout" element={<CheckoutPage />} />
+                    <Route path="login" element={<LoginPage />} />
+                    <Route path="register" element={<RegisterPage />} />
+                    <Route path="order-history" element={<OrderHistory />} />
+                    <Route path="order/:id" element={<OrderDetail />} />
+                    <Route path="profile" element={<UserProfile />} />
+                  </Route>
                 </Routes>
               </div>
             </SettingsProvider>

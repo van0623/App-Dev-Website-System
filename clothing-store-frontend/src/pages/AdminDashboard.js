@@ -12,6 +12,8 @@ const AdminDashboard = () => {
     totalUsers: 0,
     totalRevenue: 0
   });
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
 
   useEffect(() => {
     if (user && user.role === 'admin') {
@@ -21,24 +23,46 @@ const AdminDashboard = () => {
 
   const fetchStats = async () => {
     try {
-      // Using mock data for now
-      setStats({
-        totalProducts: 24,
-        totalOrders: 158,
-        totalUsers: 87,
-        totalRevenue: 125850
-      });
-      
-      // Uncomment when backend is ready
-      // const response = await axios.get('http://localhost:5000/api/admin/stats');
-      // setStats(response.data);
+      setLoading(true);
+      setError(null);
+      const response = await axios.get('http://localhost:5000/api/admin/stats');
+      setStats(response.data);
     } catch (error) {
       console.error('Error fetching stats:', error);
+      setError('Failed to load dashboard statistics. Please try again later.');
+    } finally {
+      setLoading(false);
     }
   };
 
   if (!user || user.role !== 'admin') {
     return <div className="access-denied">Access Denied: Admin Only</div>;
+  }
+
+  if (loading) {
+    return (
+      <div className="admin-dashboard">
+        <div className="container">
+          <div className="loading">Loading dashboard statistics...</div>
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="admin-dashboard">
+        <div className="container">
+          <div className="error-message">
+            <i className="fas fa-exclamation-circle"></i>
+            {error}
+            <button onClick={fetchStats} className="btn btn-primary">
+              Retry
+            </button>
+          </div>
+        </div>
+      </div>
+    );
   }
 
   return (
@@ -51,7 +75,7 @@ const AdminDashboard = () => {
           <h1>Admin Dashboard</h1>
         </div>
         
-        <p>Welcome back, {user.first_name}!</p>
+        <p className="welcome-message">Welcome back, {user.first_name}!</p>
 
         <div className="stats-grid">
           <div className="stat-card">

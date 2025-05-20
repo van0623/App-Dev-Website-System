@@ -12,7 +12,11 @@ function RegisterPage() {
     email: '',
     password: '',
     confirmPassword: '',
-    adminCode: ''
+    adminCode: '',
+    phone: '',
+    address: '',
+    city: '',
+    zipCode: ''
   });
   const [loading, setLoading] = useState(false);
   const [passwordStrength, setPasswordStrength] = useState('');
@@ -23,14 +27,10 @@ function RegisterPage() {
     const hasUpperCase = /[A-Z]/.test(password);
     const hasLowerCase = /[a-z]/.test(password);
     const hasNumbers = /\d/.test(password);
-    const hasSpecialChar = /[!@#$%^&*(),.?":{}|<>]/.test(password);
-    const isLongEnough = password.length >= 8;
 
-    if (!isLongEnough) return 'Password must be at least 8 characters long';
     if (!hasUpperCase) return 'Password must contain at least one uppercase letter';
     if (!hasLowerCase) return 'Password must contain at least one lowercase letter';
     if (!hasNumbers) return 'Password must contain at least one number';
-    if (!hasSpecialChar) return 'Password must contain at least one special character';
     return 'strong';
   };
 
@@ -65,12 +65,16 @@ function RegisterPage() {
     try {
       const role = formData.adminCode === 'admin000' ? 'admin' : 'customer';
 
-      const res = await axios.post('http://localhost:5000/api/register', {
+      const res = await axios.post('http://localhost:5000/api/auth/register', {
         firstName: formData.firstName,
         lastName: formData.lastName,
         email: formData.email,
         password: formData.password,
         role,
+        phone: formData.phone,
+        address: formData.address,
+        city: formData.city,
+        zipCode: formData.zipCode
       });
 
       if (res.data.success) {
@@ -134,6 +138,63 @@ function RegisterPage() {
           </div>
 
           <div className="form-group">
+            <label htmlFor="phone">Phone Number</label>
+            <input
+              type="tel"
+              id="phone"
+              name="phone"
+              placeholder="Enter your phone number"
+              value={formData.phone}
+              onChange={handleChange}
+              required
+              disabled={loading}
+            />
+          </div>
+
+          <div className="form-group">
+            <label htmlFor="address">Address</label>
+            <input
+              type="text"
+              id="address"
+              name="address"
+              placeholder="Enter your address"
+              value={formData.address}
+              onChange={handleChange}
+              required
+              disabled={loading}
+            />
+          </div>
+
+          <div className="form-row">
+            <div className="form-group">
+              <label htmlFor="city">City</label>
+              <input
+                type="text"
+                id="city"
+                name="city"
+                placeholder="Enter your city"
+                value={formData.city}
+                onChange={handleChange}
+                required
+                disabled={loading}
+              />
+            </div>
+            <div className="form-group">
+              <label htmlFor="zipCode">ZIP Code</label>
+              <input
+                type="text"
+                id="zipCode"
+                name="zipCode"
+                placeholder="Enter ZIP code"
+                value={formData.zipCode}
+                onChange={handleChange}
+                required
+                disabled={loading}
+              />
+            </div>
+          </div>
+
+          <div className="form-group">
             <label htmlFor="password">Password</label>
             <input
               type="password"
@@ -149,9 +210,6 @@ function RegisterPage() {
               <div className="password-strength">
                 <p>Password must contain:</p>
                 <ul>
-                  <li className={formData.password.length >= 8 ? 'valid' : 'invalid'}>
-                    At least 8 characters
-                  </li>
                   <li className={/[A-Z]/.test(formData.password) ? 'valid' : 'invalid'}>
                     One uppercase letter
                   </li>
@@ -160,9 +218,6 @@ function RegisterPage() {
                   </li>
                   <li className={/\d/.test(formData.password) ? 'valid' : 'invalid'}>
                     One number
-                  </li>
-                  <li className={/[!@#$%^&*(),.?":{}|<>]/.test(formData.password) ? 'valid' : 'invalid'}>
-                    One special character
                   </li>
                 </ul>
               </div>

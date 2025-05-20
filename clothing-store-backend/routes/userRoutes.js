@@ -3,61 +3,6 @@ const bcrypt = require('bcrypt');
 const router = express.Router();
 const db = require('../config/db');
 
-// Get user profile
-router.get('/:id', async (req, res) => {
-  try {
-    const userId = req.params.id;
-    
-    const [userRows] = await db.execute(
-      'SELECT id, first_name, last_name, email, phone, address, city, zip_code, role FROM users WHERE id = ?',
-      [userId]
-    );
-    
-    if (userRows.length === 0) {
-      return res.status(404).json({ success: false, message: 'User not found' });
-    }
-    
-    const user = userRows[0];
-    user.firstName = user.first_name;
-    user.lastName = user.last_name;
-    user.zipCode = user.zip_code;
-    
-    res.json({ success: true, user });
-  } catch (error) {
-    console.error('Get user error:', error);
-    res.status(500).json({ success: false, message: 'Server error' });
-  }
-});
-
-// Update user profile
-router.put('/:id', async (req, res) => {
-  try {
-    const userId = req.params.id;
-    const { firstName, lastName, email, phone, address, city, zipCode } = req.body;
-    
-    await db.execute(
-      'UPDATE users SET first_name = ?, last_name = ?, email = ?, phone = ?, address = ?, city = ?, zip_code = ? WHERE id = ?',
-      [firstName, lastName, email, phone, address, city, zipCode, userId]
-    );
-    
-    // Get updated user
-    const [userRows] = await db.execute(
-      'SELECT id, first_name, last_name, email, phone, address, city, zip_code, role FROM users WHERE id = ?',
-      [userId]
-    );
-    
-    const user = userRows[0];
-    user.firstName = user.first_name;
-    user.lastName = user.last_name;
-    user.zipCode = user.zip_code;
-    
-    res.json({ success: true, user, message: 'Profile updated successfully' });
-  } catch (error) {
-    console.error('Update user error:', error);
-    res.status(500).json({ success: false, message: 'Failed to update profile' });
-  }
-});
-
 // Update user password
 router.put('/:id/password', async (req, res) => {
   try {
@@ -94,6 +39,68 @@ router.put('/:id/password', async (req, res) => {
   } catch (error) {
     console.error('Update password error:', error);
     res.status(500).json({ success: false, message: 'Failed to update password' });
+  }
+});
+
+// Get user profile
+router.get('/:id', async (req, res) => {
+  try {
+    const userId = req.params.id;
+    
+    const [userRows] = await db.execute(
+      'SELECT id, first_name, last_name, email, phone, address, city, zip_code, role FROM users WHERE id = ?',
+      [userId]
+    );
+    
+    if (userRows.length === 0) {
+      return res.status(404).json({ success: false, message: 'User not found' });
+    }
+    
+    const user = userRows[0];
+    res.json({ success: true, user });
+  } catch (error) {
+    console.error('Get user error:', error);
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+});
+
+// Update user profile
+router.put('/:id', async (req, res) => {
+  try {
+    const userId = req.params.id;
+    const { first_name, last_name, email, phone, address, city, zip_code } = req.body;
+    
+    console.log('Updating profile for user:', userId);
+    console.log('Update data:', { first_name, last_name, email, phone, address, city, zip_code });
+    
+    // Update user profile
+    await db.execute(
+      'UPDATE users SET first_name = ?, last_name = ?, email = ?, phone = ?, address = ?, city = ?, zip_code = ? WHERE id = ?',
+      [first_name, last_name, email, phone, address, city, zip_code, userId]
+    );
+    
+    // Get updated user data
+    const [userRows] = await db.execute(
+      'SELECT id, first_name, last_name, email, phone, address, city, zip_code, role FROM users WHERE id = ?',
+      [userId]
+    );
+    
+    if (userRows.length === 0) {
+      console.log('User not found after update:', userId);
+      return res.status(404).json({ success: false, message: 'User not found' });
+    }
+    
+    const user = userRows[0];
+    console.log('Updated user data:', user);
+    
+    res.json({ 
+      success: true, 
+      user, 
+      message: 'Profile updated successfully' 
+    });
+  } catch (error) {
+    console.error('Update user error:', error);
+    res.status(500).json({ success: false, message: 'Failed to update profile' });
   }
 });
 

@@ -19,8 +19,8 @@ const AdminLanding = () => {
               <div className="admin-avatar">
                 <span>{user.first_name?.charAt(0)}{user.last_name?.charAt(0)}</span>
               </div>
-              <h1>Welcome Back, {user.first_name}!</h1>
-              <p>Choose your administrative destination</p>
+              <h1>Welcome Back, <span className="highlight">{user.first_name}</span></h1>
+              <p className="welcome-subtitle">Your administrative dashboard awaits</p>
             </div>
           </div>
 

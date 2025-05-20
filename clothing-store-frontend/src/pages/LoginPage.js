@@ -51,7 +51,7 @@ const LoginPage = () => {
     console.log('Attempting login with:', formData.email);
 
     try {
-      const response = await axios.post('http://localhost:5000/api/login', {
+      const response = await axios.post('http://localhost:5000/api/auth/login', {
         email: formData.email,
         password: formData.password
       });
@@ -61,9 +61,13 @@ const LoginPage = () => {
         const userData = {
           id: response.data.user.id,
           email: response.data.user.email,
-          first_name: response.data.user.first_name,  // Correct field name
-          last_name: response.data.user.last_name,    // Correct field name
-          role: response.data.user.role               // IMPORTANT: Include role
+          first_name: response.data.user.first_name,
+          last_name: response.data.user.last_name,
+          role: response.data.user.role,
+          phone: response.data.user.phone,
+          address: response.data.user.address,
+          city: response.data.user.city,
+          zip_code: response.data.user.zip_code
         };
         
         console.log('Login successful, user data:', userData); 

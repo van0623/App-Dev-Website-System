@@ -21,14 +21,27 @@ const OrderHistory = () => {
   const fetchOrders = async () => {
     try {
       setLoading(true);
+      console.log('Fetching orders for user:', user.id);
       const response = await axios.get(`http://localhost:5000/api/orders/user/${user.id}`);
+      console.log('Orders response:', response.data);
       
       if (response.data.success) {
-        setOrders(response.data.orders);
+        const ordersWithValidImages = response.data.orders.map(order => ({
+          ...order,
+          items: order.items.map(item => ({
+            ...item,
+            image_url: item.image_url || `https://via.placeholder.com/150?text=${encodeURIComponent(item.product_name)}`
+          }))
+        }));
+        console.log('Processed orders:', ordersWithValidImages);
+        setOrders(ordersWithValidImages);
+      } else {
+        console.error('Failed to fetch orders:', response.data);
+        setError('Failed to fetch orders');
       }
     } catch (error) {
-      setError('Failed to fetch orders');
-      console.error('Fetch orders error:', error);
+      console.error('Fetch orders error:', error.response || error);
+      setError('Failed to fetch orders: ' + (error.response?.data?.message || error.message));
     } finally {
       setLoading(false);
     }

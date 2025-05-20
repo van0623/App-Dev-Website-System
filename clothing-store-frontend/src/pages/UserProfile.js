@@ -13,13 +13,13 @@ const UserProfile = () => {
   const [success, setSuccess] = useState('');
   
   const [formData, setFormData] = useState({
-    firstName: '',
-    lastName: '',
+    first_name: '',
+    last_name: '',
     email: '',
     phone: '',
     address: '',
     city: '',
-    zipCode: ''
+    zip_code: ''
   });
 
   const [passwordData, setPasswordData] = useState({
@@ -33,13 +33,13 @@ const UserProfile = () => {
   useEffect(() => {
     if (user) {
       setFormData({
-        firstName: user.firstName || '',
-        lastName: user.lastName || '',
+        first_name: user.first_name || '',
+        last_name: user.last_name || '',
         email: user.email || '',
         phone: user.phone || '',
         address: user.address || '',
         city: user.city || '',
-        zipCode: user.zipCode || ''
+        zip_code: user.zip_code || ''
       });
     }
   }, [user]);
@@ -64,17 +64,33 @@ const UserProfile = () => {
     setError('');
     setSuccess('');
 
+    console.log('Updating profile for user:', user.id);
+    console.log('Form data:', formData);
+
     try {
-      const response = await axios.put(`http://localhost:5000/api/users/${user.id}`, formData);
+      const response = await axios.put(`http://localhost:5000/api/users/${user.id}`, {
+        first_name: formData.first_name,
+        last_name: formData.last_name,
+        email: formData.email,
+        phone: formData.phone,
+        address: formData.address,
+        city: formData.city,
+        zip_code: formData.zip_code
+      });
+      
+      console.log('Profile update response:', response.data);
       
       if (response.data.success) {
-        setUser(response.data.user);
+        setUser({
+          ...user,
+          ...response.data.user
+        });
         setSuccess('Profile updated successfully!');
         setIsEditing(false);
       }
     } catch (error) {
+      console.error('Profile update error details:', error.response?.data || error.message);
       setError('Failed to update profile. Please try again.');
-      console.error('Profile update error:', error);
     } finally {
       setLoading(false);
     }
@@ -145,9 +161,6 @@ const UserProfile = () => {
 
         <div className="profile-header">
           <h1>My Profile</h1>
-          <div className="profile-avatar">
-            {user.firstName?.charAt(0)}{user.lastName?.charAt(0)}
-          </div>
         </div>
 
         {error && <div className="error-message">{error}</div>}
@@ -161,11 +174,11 @@ const UserProfile = () => {
               <div className="profile-info">
                 <div className="info-row">
                   <label>First Name:</label>
-                  <span>{formData.firstName || 'Not provided'}</span>
+                  <span>{formData.first_name || 'Not provided'}</span>
                 </div>
                 <div className="info-row">
                   <label>Last Name:</label>
-                  <span>{formData.lastName || 'Not provided'}</span>
+                  <span>{formData.last_name || 'Not provided'}</span>
                 </div>
                 <div className="info-row">
                   <label>Email:</label>
@@ -185,7 +198,7 @@ const UserProfile = () => {
                 </div>
                 <div className="info-row">
                   <label>ZIP Code:</label>
-                  <span>{formData.zipCode || 'Not provided'}</span>
+                  <span>{formData.zip_code || 'Not provided'}</span>
                 </div>
                 
                 <div className="profile-actions">
@@ -207,23 +220,23 @@ const UserProfile = () => {
               <form onSubmit={handleProfileUpdate} className="profile-form">
                 <div className="form-row">
                   <div className="form-group">
-                    <label htmlFor="firstName">First Name</label>
+                    <label htmlFor="first_name">First Name</label>
                     <input
                       type="text"
-                      id="firstName"
-                      name="firstName"
-                      value={formData.firstName}
+                      id="first_name"
+                      name="first_name"
+                      value={formData.first_name}
                       onChange={handleInputChange}
                       required
                     />
                   </div>
                   <div className="form-group">
-                    <label htmlFor="lastName">Last Name</label>
+                    <label htmlFor="last_name">Last Name</label>
                     <input
                       type="text"
-                      id="lastName"
-                      name="lastName"
-                      value={formData.lastName}
+                      id="last_name"
+                      name="last_name"
+                      value={formData.last_name}
                       onChange={handleInputChange}
                       required
                     />
@@ -276,12 +289,12 @@ const UserProfile = () => {
                     />
                   </div>
                   <div className="form-group">
-                    <label htmlFor="zipCode">ZIP Code</label>
+                    <label htmlFor="zip_code">ZIP Code</label>
                     <input
                       type="text"
-                      id="zipCode"
-                      name="zipCode"
-                      value={formData.zipCode}
+                      id="zip_code"
+                      name="zip_code"
+                      value={formData.zip_code}
                       onChange={handleInputChange}
                     />
                   </div>

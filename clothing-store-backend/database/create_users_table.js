@@ -12,6 +12,10 @@ async function createUsersTable() {
         last_name VARCHAR(50) NOT NULL DEFAULT '',
         email VARCHAR(255) NOT NULL UNIQUE,
         password VARCHAR(255) NOT NULL,
+        phone VARCHAR(20) DEFAULT NULL,
+        address VARCHAR(255) DEFAULT NULL,
+        city VARCHAR(100) DEFAULT NULL,
+        zip_code VARCHAR(20) DEFAULT NULL,
         role ENUM('admin', 'customer') NOT NULL DEFAULT 'customer',
         created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
       )
@@ -19,6 +23,17 @@ async function createUsersTable() {
     
     await db.query(createTableSQL);
     console.log('Users table created or already exists');
+
+    // Add new columns if they don't exist
+    try {
+      await db.query('ALTER TABLE users ADD COLUMN IF NOT EXISTS phone VARCHAR(20) DEFAULT NULL');
+      await db.query('ALTER TABLE users ADD COLUMN IF NOT EXISTS address VARCHAR(255) DEFAULT NULL');
+      await db.query('ALTER TABLE users ADD COLUMN IF NOT EXISTS city VARCHAR(100) DEFAULT NULL');
+      await db.query('ALTER TABLE users ADD COLUMN IF NOT EXISTS zip_code VARCHAR(20) DEFAULT NULL');
+      console.log('New columns added successfully');
+    } catch (err) {
+      console.log('Columns might already exist:', err.message);
+    }
     
     // Check if there's at least one admin user
     const [admins] = await db.query('SELECT * FROM users WHERE role = "admin" LIMIT 1');

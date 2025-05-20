@@ -25,8 +25,15 @@ const OrderDetail = () => {
       const response = await axios.get(`http://localhost:5000/api/orders/${id}`);
       
       if (response.data.success) {
-        setOrder(response.data.order);
-        setOrderItems(response.data.orderItems || []);
+        const orderWithValidImages = {
+          ...response.data.order,
+          items: response.data.orderItems.map(item => ({
+            ...item,
+            image_url: item.image_url || `https://via.placeholder.com/150?text=${encodeURIComponent(item.product_name)}`
+          }))
+        };
+        setOrder(orderWithValidImages);
+        setOrderItems(orderWithValidImages.items || []);
       } else {
         setError('Order not found');
       }

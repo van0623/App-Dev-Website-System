@@ -13,6 +13,7 @@ function ShopPage() {
   const [error, setError] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('All');
+  const [storeSettings, setStoreSettings] = useState(null);
   const { addToCart } = useCart();
 
   // Default/sample products with categories
@@ -66,6 +67,20 @@ function ShopPage() {
       category: "Sweatshirts"
     }
   ];
+
+  // Fetch store settings
+  useEffect(() => {
+    const fetchStoreSettings = async () => {
+      try {
+        const response = await axios.get('http://localhost:5000/api/store-settings');
+        setStoreSettings(response.data);
+      } catch (error) {
+        console.error('Error fetching store settings:', error);
+      }
+    };
+
+    fetchStoreSettings();
+  }, []);
 
   // Try to fetch products from backend, but use default if it fails
   useEffect(() => {
@@ -196,9 +211,18 @@ function ShopPage() {
       )}
 
       <div className="shop-footer">
-        <Link to="/" className="btn btn-secondary">
-          Back to Home
-        </Link>
+        <div className="contact-info">
+          <div className="contact-item">
+            <h3>Contact Us</h3>
+            <p>Email: {storeSettings?.contact_email || 'support@fearofgod.com'}</p>
+            <p>Phone: {storeSettings?.contact_phone || '+63 912 345 6789'}</p>
+          </div>
+          <div className="contact-item">
+            <h3>Location</h3>
+            <p>{storeSettings?.store_address || '123 Fashion Street'}</p>
+            <p>{storeSettings?.store_city || 'Manila'}, {storeSettings?.store_country || 'Philippines'}</p>
+          </div>
+        </div>
       </div>
     </div>
   );
