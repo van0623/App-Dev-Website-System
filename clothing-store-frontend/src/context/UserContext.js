@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useState } from 'react';
+import axios from 'axios';
 
 const UserContext = createContext();
 
@@ -41,6 +42,25 @@ export const UserProvider = ({ children }) => {
     const afterStorageKeys = Object.keys(localStorage);
     console.log('UserContext: localStorage keys after logout:', afterStorageKeys);
   };
+
+  const refreshUser = async () => {
+    const savedUser = localStorage.getItem('user');
+    if (savedUser) {
+      try {
+        const parsedUser = JSON.parse(savedUser);
+        // Fetch fresh user data from the server
+        const response = await axios.get(`http://localhost:5000/api/users/${parsedUser.id}`);
+        if (response.data.success) {
+          const freshUserData = response.data.user;
+          setUser(freshUserData);
+          localStorage.setItem('user', JSON.stringify(freshUserData));
+          console.log('UserContext: Refreshed user data:', freshUserData);
+        }
+      } catch (error) {
+        console.error('Error refreshing user data:', error);
+      }
+    }
+  };
   
   // Check for saved user data on component mount
   React.useEffect(() => {
@@ -51,6 +71,8 @@ export const UserProvider = ({ children }) => {
         console.log('UserContext: Found saved user in localStorage:', parsedUser);
         setUser(parsedUser);
         setIsAuthenticated(true);
+        // Refresh user data from server
+        refreshUser();
       } catch (error) {
         console.error('Error parsing saved user data:', error);
         localStorage.removeItem('user');
@@ -66,7 +88,8 @@ export const UserProvider = ({ children }) => {
     setUser,
     setIsAuthenticated,
     login,
-    logout
+    logout,
+    refreshUser
   };
 
   return <UserContext.Provider value={value}>{children}</UserContext.Provider>;

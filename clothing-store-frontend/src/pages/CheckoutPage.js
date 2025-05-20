@@ -218,23 +218,32 @@
 
 
 // src/pages/CheckoutPage.js
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useCart } from '../context/CartContext';
 import { Link, useNavigate } from 'react-router-dom';
 import '../App.css';
 import axios from 'axios';
 import { useUser } from '../context/UserContext';
+import { useNotification } from '../context/NotificationContext';
 
 const CheckoutPage = () => {
   const navigate = useNavigate();
+  const { showError } = useNotification();
   
   const { cart = [], clearCart, getCartTotal, getCartItemCount } = useCart() || {};
   const { isAuthenticated, user } = useUser() || {};
   
   const [orderPlaced, setOrderPlaced] = useState(false);
+  const [loading, setLoading] = useState(false);
   const [formData, setFormData] = useState({
     paymentMethod: 'cash-on-delivery'
   });
+
+  // Add debug logging
+  useEffect(() => {
+    console.log('CheckoutPage - User:', user);
+    console.log('CheckoutPage - Cart:', cart);
+  }, [user, cart]);
 
   // Calculate shipping based on total
   const calculateShipping = () => {
@@ -253,15 +262,16 @@ const CheckoutPage = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    setLoading(true);
 
     if (!isAuthenticated || !user) {
-      alert('Please log in to place your order.');
+      showError('Please log in to place your order.');
       navigate('/login');
       return;
     }
 
     if (!cart.length) {
-      alert('Your cart is empty.');
+      showError('Your cart is empty.');
       navigate('/cart');
       return;
     }
@@ -288,13 +298,33 @@ const CheckoutPage = () => {
         setOrderPlaced(true);
         clearCart();
       } else {
-        alert('Failed to place order. Please try again.');
+        showError('Failed to place order. Please try again.');
       }
     } catch (error) {
       console.error('Error creating order:', error);
-      alert('Failed to place order. Please try again.');
+      showError('Failed to place order. Please try again.');
+    } finally {
+      setLoading(false);
     }
   };
+
+  if (!isAuthenticated || !user) {
+    return (
+      <div className="checkout-page">
+        <div className="container">
+          <div className="login-prompt">
+            <h2>Please Log In</h2>
+            <p>You need to be logged in to complete your purchase.</p>
+            <div className="login-actions">
+              <Link to="/login" className="btn btn-primary">Log In</Link>
+              <span className="or-divider">or</span>
+              <Link to="/register" className="btn btn-secondary">Create Account</Link>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   if (!cart.length && !orderPlaced) {
     return (
@@ -339,13 +369,14 @@ const CheckoutPage = () => {
           <div className="checkout-form">
             <h2>Shipping Information</h2>
             <div className="shipping-info-display">
-              <p><strong>Name:</strong> {user?.first_name} {user?.last_name}</p>
-              <p><strong>Email:</strong> {user?.email}</p>
-              <p><strong>Phone:</strong> {user?.phone}</p>
-              <p><strong>Address:</strong> {user?.address}</p>
-              <p><strong>City:</strong> {user?.city}</p>
-              <p><strong>ZIP Code:</strong> {user?.zip_code}</p>
+              <p><strong>Name:</strong> {user.first_name} {user.last_name}</p>
+              <p><strong>Email:</strong> {user.email}</p>
+              <p><strong>Phone:</strong> {user.phone || 'Not provided'}</p>
+              <p><strong>Address:</strong> {user.address || 'Not provided'}</p>
+              <p><strong>City:</strong> {user.city || 'Not provided'}</p>
+              <p><strong>ZIP Code:</strong> {user.zip_code || 'Not provided'}</p>
             </div>
+
             <form onSubmit={handleSubmit}>
               <div className="form-group">
                 <label htmlFor="paymentMethod">Payment Method</label>
@@ -361,9 +392,16 @@ const CheckoutPage = () => {
                   value="cash-on-delivery"
                 />
               </div>
+
               <div className="checkout-actions">
                 <Link to="/cart" className="btn btn-secondary">Back to Cart</Link>
-                <button type="submit" className="btn btn-primary">Place Order</button>
+                <button 
+                  type="submit" 
+                  className="btn btn-primary"
+                  disabled={loading}
+                >
+                  {loading ? 'Processing...' : 'Place Order'}
+                </button>
               </div>
             </form>
           </div>
@@ -383,6 +421,7 @@ const CheckoutPage = () => {
                 </div>
               </div>
             ))}
+            
             <div className="order-total">
               <div className="total-row">
                 <span>Subtotal ({getCartItemCount()} items)</span>

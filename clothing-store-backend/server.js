@@ -1,6 +1,7 @@
 const express = require('express');
 const cors = require('cors');
 const dotenv = require('dotenv');
+const path = require('path');
 
 // Load environment variables
 dotenv.config();
@@ -10,6 +11,10 @@ const app = express();
 // Middleware
 app.use(cors());
 app.use(express.json()); // Parses incoming JSON requests
+app.use(express.urlencoded({ extended: true }));
+
+// Serve static files from the uploads directory
+app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
 // Route imports
 const productRoutes = require('./routes/productRoutes');
@@ -21,17 +26,18 @@ const userRoutes = require('./routes/userRoutes');
 const settingsRoutes = require('./routes/settingsRoutes');
 
 // API Routes
-app.use('/api/products', productRoutes);      // e.g., /api/products/:id
-app.use('/api/auth', authRoutes);             // e.g., /api/auth/login
-app.use('/api/cart', cartRoutes);             // Changed for clarity: /api/cart
-app.use('/api/orders', orderRoutes);          // e.g., /api/orders/:id
-app.use('/api/admin', adminRoutes);           // e.g., /api/admin/stats
-app.use('/api/users', userRoutes);            // e.g., /api/users/:id
-app.use('/api/settings', settingsRoutes);     // e.g., /api/settings/site
+app.use('/api/products', productRoutes);
+app.use('/api/auth', authRoutes);
+app.use('/api/cart', cartRoutes);
+app.use('/api/orders', orderRoutes);
+app.use('/api/admin', adminRoutes);
+app.use('/api/users', userRoutes);
+app.use('/api/store-settings', settingsRoutes);
 
-// Fallback route
-app.use('/', (req, res) => {
-  res.status(404).json({ message: 'API route not found' });
+// Error handling middleware
+app.use((err, req, res, next) => {
+  console.error(err.stack);
+  res.status(500).json({ message: 'Something went wrong!', error: err.message });
 });
 
 // Server listener

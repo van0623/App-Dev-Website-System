@@ -10,13 +10,22 @@ const pool = mysql.createPool({
   database: process.env.DB_NAME || 'clothing_store',
   waitForConnections: true,
   connectionLimit: 10,
-  queueLimit: 0
+  queueLimit: 0,
+  enableKeepAlive: true,
+  keepAliveInitialDelay: 0
 });
 
 // Get a promise wrapper around the pool
 const promisePool = pool.promise();
 
-console.log('Connected to database.');
-
+// Test the connection
+pool.getConnection((err, connection) => {
+  if (err) {
+    console.error('Error connecting to the database:', err);
+    return;
+  }
+  console.log('Successfully connected to database.');
+  connection.release();
+});
 
 module.exports = promisePool;

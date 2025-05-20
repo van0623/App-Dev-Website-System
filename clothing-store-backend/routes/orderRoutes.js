@@ -3,13 +3,15 @@
 const express = require('express');
 const router = express.Router();
 const db = require('../config/db'); // your promise-based pool
+const { isAdmin } = require('../middleware/auth');
 
 // Get user's orders with items
 router.get('/user/:userId', async (req, res) => {
-  const { userId } = req.params;
-
   try {
-    const query = `
+    const userId = req.params.userId;
+    console.log('Fetching orders for user:', userId);
+    
+    const [orders] = await db.query(`
       SELECT 
         o.*,
         oi.id as item_id,
@@ -23,29 +25,29 @@ router.get('/user/:userId', async (req, res) => {
       LEFT JOIN order_items oi ON o.id = oi.order_id
       WHERE o.user_id = ? 
       ORDER BY o.created_at DESC
-    `;
+    `, [userId]);
 
-    const [results] = await db.query(query, [userId]);
+    console.log('Found orders:', orders);
 
-    // Group results by order
-    const orders = {};
-    results.forEach(row => {
-      if (!orders[row.id]) {
-        orders[row.id] = {
+    // Group items by order
+    const ordersWithItems = orders.reduce((acc, row) => {
+      const orderId = row.id;
+      if (!acc[orderId]) {
+        acc[orderId] = {
           id: row.id,
+          order_number: row.order_number,
           user_id: row.user_id,
           total_amount: row.total_amount,
           shipping_address: row.shipping_address,
           order_status: row.order_status,
           payment_status: row.payment_status,
           created_at: row.created_at,
-          updated_at: row.updated_at,
           items: []
         };
       }
-
+      
       if (row.item_id) {
-        orders[row.id].items.push({
+        acc[orderId].items.push({
           id: row.item_id,
           product_id: row.product_id,
           product_name: row.product_name,
@@ -55,146 +57,316 @@ router.get('/user/:userId', async (req, res) => {
           image_url: row.image_url
         });
       }
+      
+      return acc;
+    }, {});
+
+    console.log('Processed orders:', ordersWithItems);
+
+    res.json({
+      success: true,
+      orders: Object.values(ordersWithItems)
     });
-
-    res.json({ success: true, orders: Object.values(orders) });
-
   } catch (error) {
-    console.error('Error fetching orders:', error);
-    res.status(500).json({ success: false, message: 'Failed to fetch orders: ' + error.message });
+    console.error('Error fetching user orders:', error);
+    res.status(500).json({ 
+      success: false, 
+      message: 'Error fetching orders',
+      error: error.message 
+    });
   }
 });
 
-// Get all orders (for admin or management use)
-router.get('/all', async (req, res) => {
+// Get all orders (admin only)
+router.get('/all', isAdmin, async (req, res) => {
   try {
-    const query = 'SELECT * FROM orders';
-    const [results] = await db.query(query);
-    res.json(results);
-  } catch (err) {
-    console.error('Error fetching orders:', err);
-    res.status(500).json({ message: 'Failed to fetch orders' });
+    const [orders] = await db.query(`
+      SELECT 
+        o.*,
+        oi.id as item_id,
+        oi.product_id,
+        oi.product_name,
+        oi.price as item_price,
+        oi.size,
+        oi.quantity,
+        oi.image_url,
+        u.first_name,
+        u.last_name,
+        u.email
+      FROM orders o
+      LEFT JOIN order_items oi ON o.id = oi.order_id
+      LEFT JOIN users u ON o.user_id = u.id
+      ORDER BY o.created_at DESC
+    `);
+
+    // Group items by order
+    const ordersWithItems = orders.reduce((acc, row) => {
+      const orderId = row.id;
+      if (!acc[orderId]) {
+        acc[orderId] = {
+          id: row.id,
+          order_number: row.order_number,
+          user_id: row.user_id,
+          customer_name: `${row.first_name} ${row.last_name}`,
+          customer_email: row.email,
+          total_amount: row.total_amount,
+          shipping_address: row.shipping_address,
+          order_status: row.order_status,
+          payment_status: row.payment_status,
+          created_at: row.created_at,
+          items: []
+        };
+      }
+      
+      if (row.item_id) {
+        acc[orderId].items.push({
+          id: row.item_id,
+          product_id: row.product_id,
+          product_name: row.product_name,
+          price: row.item_price,
+          size: row.size,
+          quantity: row.quantity,
+          image_url: row.image_url
+        });
+      }
+      
+      return acc;
+    }, {});
+
+    res.json({
+      success: true,
+      orders: Object.values(ordersWithItems)
+    });
+  } catch (error) {
+    console.error('Error fetching all orders:', error);
+    res.status(500).json({ 
+      success: false, 
+      message: 'Error fetching orders',
+      error: error.message 
+    });
   }
 });
 
-// Create a new order
+// Create new order
 router.post('/create', async (req, res) => {
-  const { userId, cartItems, totalAmount, shippingAmount, taxAmount, shippingInfo } = req.body;
-
-  // Basic validation
-  if (!userId || !shippingInfo || !shippingInfo.firstName || !shippingInfo.lastName || !shippingInfo.address) {
-    return res.status(400).json({ success: false, message: 'Missing required user or shipping information' });
-  }
-  if (!Array.isArray(cartItems)) {
-    return res.status(400).json({ success: false, message: 'cartItems must be an array' });
-  }
-
   try {
-    // Combine shipping info into a single address string
-    const shippingAddress = `${shippingInfo.firstName} ${shippingInfo.lastName}, ${shippingInfo.address}, ${shippingInfo.city || ''}, ${shippingInfo.zipCode || ''}. Phone: ${shippingInfo.phone || 'N/A'}, Email: ${shippingInfo.email || 'N/A'}`;
+    const { 
+      userId, 
+      cartItems, 
+      totalAmount, 
+      shippingAmount, 
+      taxAmount,
+      shippingInfo 
+    } = req.body;
 
-    // Insert order into database
-    const [orderResult] = await db.query(
-      `INSERT INTO orders (user_id, total_amount, shipping_address, order_status, payment_status) 
-       VALUES (?, ?, ?, 'pending', 'pending')`,
-      [userId, totalAmount, shippingAddress]
-    );
-
-    const orderNumber = orderResult.insertId;
-
-    if (cartItems.length === 0) {
-      return res.json({
-        success: true,
-        orderNumber,
-        message: 'Order created successfully (no items)'
+    // Validate user exists
+    const [users] = await db.query('SELECT * FROM users WHERE id = ?', [userId]);
+    if (users.length === 0) {
+      return res.status(404).json({ 
+        success: false, 
+        message: 'User not found' 
       });
     }
 
-    // Insert each cart item in parallel
-    const insertItemsPromises = cartItems.map(item => 
-      db.query(
-        `INSERT INTO order_items (order_id, product_id, product_name, price, size, quantity, image_url) 
-         VALUES (?, ?, ?, ?, ?, ?, ?)`,
-        [orderNumber, item.id, item.name, item.price, item.size, item.quantity, item.image]
-      )
-    );
+    // Generate order number
+    const orderNumber = `ORD-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
 
-    await Promise.all(insertItemsPromises);
+    // Format shipping address
+    const shippingAddress = `
+Customer Information:
+Name: ${shippingInfo.firstName} ${shippingInfo.lastName}
+Email: ${shippingInfo.email}
+Phone: ${shippingInfo.phone}
 
-    res.json({
-      success: true,
-      orderNumber,
-      message: 'Order created successfully'
-    });
+Shipping Information:
+Address: ${shippingInfo.address}
+City: ${shippingInfo.city}
+ZIP Code: ${shippingInfo.zipCode}
+    `.trim();
 
+    // Start transaction
+    await db.beginTransaction();
+
+    try {
+      // Insert order
+    const [orderResult] = await db.query(
+        'INSERT INTO orders (order_number, user_id, total_amount, shipping_address, order_status, payment_status) VALUES (?, ?, ?, ?, ?, ?)',
+        [orderNumber, userId, totalAmount, shippingAddress, 'pending', 'pending']
+      );
+
+      const orderId = orderResult.insertId;
+
+      // Insert order items
+      for (const item of cartItems) {
+        await db.query(
+          'INSERT INTO order_items (order_id, product_id, product_name, price, size, quantity, image_url) VALUES (?, ?, ?, ?, ?, ?, ?)',
+          [orderId, item.id, item.name, item.price, item.size, item.quantity, item.image]
+        );
+      }
+
+      // Commit transaction
+      await db.commit();
+
+      res.json({
+        success: true,
+        message: 'Order created successfully',
+        orderNumber,
+        orderId
+      });
+    } catch (error) {
+      // Rollback transaction on error
+      await db.rollback();
+      throw error;
+    }
   } catch (error) {
-    console.error('Error processing order:', error);
-    res.status(500).json({ success: false, message: 'Internal server error' });
+    console.error('Error creating order:', error);
+    res.status(500).json({ 
+      success: false, 
+      message: 'Error creating order',
+      error: error.message 
+    });
   }
 });
 
-// Get a single order by ID with items
+// Get single order
 router.get('/:id', async (req, res) => {
-  const orderId = req.params.id;
-
   try {
-    const [orders] = await db.query('SELECT * FROM orders WHERE id = ?', [orderId]);
+    const orderId = req.params.id;
+    
+    const [orders] = await db.query(`
+      SELECT 
+        o.*,
+        oi.id as item_id,
+        oi.product_id,
+        oi.product_name,
+        oi.price as item_price,
+        oi.size,
+        oi.quantity,
+        oi.image_url,
+        u.first_name,
+        u.last_name,
+        u.email
+      FROM orders o
+      LEFT JOIN order_items oi ON o.id = oi.order_id
+      LEFT JOIN users u ON o.user_id = u.id
+      WHERE o.id = ?
+    `, [orderId]);
+
     if (orders.length === 0) {
-      return res.status(404).json({ success: false, message: 'Order not found' });
+      return res.status(404).json({ 
+        success: false, 
+        message: 'Order not found' 
+      });
     }
 
-    const [items] = await db.query('SELECT * FROM order_items WHERE order_id = ?', [orderId]);
+    // Group items by order
+    const orderWithItems = orders.reduce((acc, row) => {
+      if (!acc.id) {
+        acc = {
+          id: row.id,
+          order_number: row.order_number,
+          user_id: row.user_id,
+          customer_name: `${row.first_name} ${row.last_name}`,
+          customer_email: row.email,
+          total_amount: row.total_amount,
+          shipping_address: row.shipping_address,
+          order_status: row.order_status,
+          payment_status: row.payment_status,
+          created_at: row.created_at,
+          items: []
+        };
+      }
+      
+      if (row.item_id) {
+        acc.items.push({
+          id: row.item_id,
+          product_id: row.product_id,
+          product_name: row.product_name,
+          price: row.item_price,
+          size: row.size,
+          quantity: row.quantity,
+          image_url: row.image_url
+        });
+      }
+      
+      return acc;
+    }, {});
 
     res.json({
       success: true,
-      order: {
-        ...orders[0],
-        items
-      }
+      order: orderWithItems
     });
   } catch (error) {
     console.error('Error fetching order:', error);
-    res.status(500).json({ success: false, message: 'Failed to fetch order' });
+    res.status(500).json({ 
+      success: false, 
+      message: 'Error fetching order',
+      error: error.message 
+    });
   }
 });
 
-// Update order status (for admin)
-router.put('/:id/status', async (req, res) => {
-  const orderId = req.params.id;
-  const { order_status } = req.body;
-
+// Update order status (admin only)
+router.put('/:id/status', isAdmin, async (req, res) => {
   try {
-    const query = 'UPDATE orders SET order_status = ? WHERE id = ?';
-    const [result] = await db.query(query, [order_status, orderId]);
+    const { id } = req.params;
+    const { status } = req.body;
+
+    const [result] = await db.query(
+      'UPDATE orders SET order_status = ? WHERE id = ?',
+      [status, id]
+    );
 
     if (result.affectedRows === 0) {
-      return res.status(404).json({ message: 'Order not found' });
+      return res.status(404).json({ 
+        success: false, 
+        message: 'Order not found' 
+      });
     }
 
-    res.json({ message: 'Order status updated successfully' });
-  } catch (err) {
-    console.error('Error updating order status:', err);
-    res.status(500).json({ message: 'Failed to update order status' });
+    res.json({ 
+      success: true, 
+      message: 'Order status updated successfully' 
+    });
+  } catch (error) {
+    console.error('Error updating order status:', error);
+    res.status(500).json({ 
+      success: false, 
+      message: 'Error updating order status',
+      error: error.message 
+    });
   }
 });
 
-// Update payment status (for admin)
-router.put('/:id/payment-status', async (req, res) => {
-  const orderId = req.params.id;
-  const { payment_status } = req.body;
-
+// Update payment status (admin only)
+router.put('/:id/payment-status', isAdmin, async (req, res) => {
   try {
-    const query = 'UPDATE orders SET payment_status = ? WHERE id = ?';
-    const [result] = await db.query(query, [payment_status, orderId]);
+    const { id } = req.params;
+    const { status } = req.body;
+
+    const [result] = await db.query(
+      'UPDATE orders SET payment_status = ? WHERE id = ?',
+      [status, id]
+    );
 
     if (result.affectedRows === 0) {
-      return res.status(404).json({ message: 'Order not found' });
+      return res.status(404).json({ 
+        success: false, 
+        message: 'Order not found' 
+      });
     }
 
-    res.json({ message: 'Payment status updated successfully' });
-  } catch (err) {
-    console.error('Error updating payment status:', err);
-    res.status(500).json({ message: 'Failed to update payment status' });
+    res.json({ 
+      success: true, 
+      message: 'Payment status updated successfully' 
+    });
+  } catch (error) {
+    console.error('Error updating payment status:', error);
+    res.status(500).json({ 
+      success: false, 
+      message: 'Error updating payment status',
+      error: error.message 
+    });
   }
 });
 

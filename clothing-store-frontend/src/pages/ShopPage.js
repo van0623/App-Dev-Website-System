@@ -16,57 +16,23 @@ function ShopPage() {
   const [storeSettings, setStoreSettings] = useState(null);
   const { addToCart } = useCart();
 
-  // Default/sample products with categories
-  const defaultProducts = [
-    {
-      id: 1,
-      name: "Faith T-Shirt",
-      description: "Comfortable cotton t-shirt with inspiring message",
-      price: 899,
-      image_url: "https://via.placeholder.com/250x250/2c5aa0/FFFFFF?text=Faith+T-Shirt",
-      category: "T-Shirts"
-    },
-    {
-      id: 2,
-      name: "Prayer Hoodie",
-      description: "Warm and cozy hoodie perfect for daily wear",
-      price: 1599,
-      image_url: "https://via.placeholder.com/250x250/28a745/FFFFFF?text=Prayer+Hoodie",
-      category: "Hoodies"
-    },
-    {
-      id: 3,
-      name: "Hope Cap",
-      description: "Stylish cap with embroidered Christian symbol",
-      price: 499,
-      image_url: "https://via.placeholder.com/250x250/6f42c1/FFFFFF?text=Hope+Cap",
-      category: "Accessories"
-    },
-    {
-      id: 4,
-      name: "Grace Jacket",
-      description: "Lightweight jacket for any season",
-      price: 2299,
-      image_url: "https://via.placeholder.com/250x250/fd7e14/FFFFFF?text=Grace+Jacket",
-      category: "Outerwear"
-    },
-    {
-      id: 5,
-      name: "Love Tank Top",
-      description: "Comfortable tank top for warm weather",
-      price: 699,
-      image_url: "https://via.placeholder.com/250x250/e83e8c/FFFFFF?text=Love+Tank",
-      category: "Tank Tops"
-    },
-    {
-      id: 6,
-      name: "Peace Sweatshirt",
-      description: "Cozy sweatshirt with peaceful message",
-      price: 1299,
-      image_url: "https://via.placeholder.com/250x250/20c997/FFFFFF?text=Peace+Sweatshirt",
-      category: "Sweatshirts"
-    }
-  ];
+  // Fetch products from backend
+  useEffect(() => {
+    const fetchProducts = async () => {
+      try {
+        const response = await axios.get('http://localhost:5000/api/products');
+        setProducts(response.data);
+        setFilteredProducts(response.data);
+        setLoading(false);
+      } catch (error) {
+        console.error('Error fetching products:', error);
+        setError('Failed to load products');
+        setLoading(false);
+      }
+    };
+
+    fetchProducts();
+  }, []);
 
   // Fetch store settings
   useEffect(() => {
@@ -80,30 +46,6 @@ function ShopPage() {
     };
 
     fetchStoreSettings();
-  }, []);
-
-  // Try to fetch products from backend, but use default if it fails
-  useEffect(() => {
-    if (process.env.REACT_APP_API_URL) {
-      axios.get(`${process.env.REACT_APP_API_URL}/api/products`)
-        .then(response => {
-          const productsData = response.data.length > 0 ? response.data : defaultProducts;
-          setProducts(productsData);
-          setFilteredProducts(productsData);
-          setLoading(false);
-        })
-        .catch(error => {
-          console.log('Backend not available, showing default products');
-          setProducts(defaultProducts);
-          setFilteredProducts(defaultProducts);
-          setLoading(false);
-        });
-    } else {
-      // If no API URL, just use default products
-      setProducts(defaultProducts);
-      setFilteredProducts(defaultProducts);
-      setLoading(false);
-    }
   }, []);
 
   // Filter products when search term or category changes
@@ -132,6 +74,10 @@ function ShopPage() {
 
   if (loading) {
     return <div className="loading">Loading products...</div>;
+  }
+
+  if (error) {
+    return <div className="error">{error}</div>;
   }
 
   return (
@@ -191,7 +137,7 @@ function ShopPage() {
             <div key={product.id} className="product-card">
               <div className="product-category">{product.category}</div>
               <img
-                src={product.image_url}
+                src={`http://localhost:5000${product.image_url}`}
                 alt={product.name}
                 className="product-image"
               />

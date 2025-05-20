@@ -5,7 +5,7 @@ import axios from 'axios';
 import '../App.css';
 
 const UserProfile = () => {
-  const { user, setUser, logout } = useUser();
+  const { user, setUser, logout, refreshUser } = useUser();
   const navigate = useNavigate();
   const [isEditing, setIsEditing] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -29,6 +29,10 @@ const UserProfile = () => {
   });
 
   const [showPasswordForm, setShowPasswordForm] = useState(false);
+
+  useEffect(() => {
+    refreshUser();
+  }, [refreshUser]);
 
   useEffect(() => {
     if (user) {
@@ -81,10 +85,7 @@ const UserProfile = () => {
       console.log('Profile update response:', response.data);
       
       if (response.data.success) {
-        setUser({
-          ...user,
-          ...response.data.user
-        });
+        await refreshUser();
         setSuccess('Profile updated successfully!');
         setIsEditing(false);
       }

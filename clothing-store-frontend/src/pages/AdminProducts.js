@@ -21,6 +21,8 @@ const AdminProducts = () => {
     stock: '',
     image_url: ''
   });
+  const [imagePreview, setImagePreview] = useState(null);
+  const [selectedFile, setSelectedFile] = useState(null);
 
   useEffect(() => {
     fetchProducts();
@@ -43,16 +45,51 @@ const AdminProducts = () => {
     });
   };
 
+  const handleImageChange = (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      setSelectedFile(file);
+      // Create a preview URL for the image
+      const previewUrl = URL.createObjectURL(file);
+      setImagePreview(previewUrl);
+    }
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     try {
+      const formDataToSend = new FormData();
+      
+      // Append all form fields
+      Object.keys(formData).forEach(key => {
+        if (key !== 'image_url') { // Don't send image_url directly
+          formDataToSend.append(key, formData[key]);
+        }
+      });
+
+      // Append the image file if one was selected
+      if (selectedFile) {
+        formDataToSend.append('image', selectedFile);
+      } else if (editingProduct && editingProduct.image_url) {
+        // If no new image is selected but there's an existing image, send the current image_url
+        formDataToSend.append('image_url', editingProduct.image_url);
+      }
+
       if (editingProduct) {
         // Update product
-        await axios.put(`http://localhost:5000/api/products/${editingProduct.id}`, formData);
+        await axios.put(`http://localhost:5000/api/products/${editingProduct.id}`, formDataToSend, {
+          headers: {
+            'Content-Type': 'multipart/form-data'
+          }
+        });
         showSuccess('Product updated successfully!');
       } else {
         // Create product
-        await axios.post('http://localhost:5000/api/products', formData);
+        await axios.post('http://localhost:5000/api/products', formDataToSend, {
+          headers: {
+            'Content-Type': 'multipart/form-data'
+          }
+        });
         showSuccess('Product created successfully!');
       }
       
@@ -66,7 +103,22 @@ const AdminProducts = () => {
 
   const handleEdit = (product) => {
     setEditingProduct(product);
-    setFormData(product);
+    setFormData({
+      name: product.name,
+      description: product.description,
+      price: product.price,
+      category: product.category,
+      size: product.size,
+      color: product.color,
+      stock: product.stock,
+      image_url: product.image_url
+    });
+    // Set image preview if there's an existing image
+    if (product.image_url) {
+      setImagePreview(`http://localhost:5000${product.image_url}`);
+    } else {
+      setImagePreview(null);
+    }
     setShowForm(true);
   };
 
@@ -96,6 +148,8 @@ const AdminProducts = () => {
     });
     setEditingProduct(null);
     setShowForm(false);
+    setImagePreview(null);
+    setSelectedFile(null);
   };
 
   if (!user || user.role !== 'admin') {
@@ -170,6 +224,8 @@ const AdminProducts = () => {
                     <option value="Shirts">Shirts</option>
                     <option value="Pants">Pants</option>
                     <option value="Shoes">Shoes</option>
+                    <option value="Hoodies">Hoodies</option>
+                    <option value="Outerwear">Outerwear</option>
                     <option value="Accessories">Accessories</option>
                   </select>
                 </div>
@@ -210,14 +266,18 @@ const AdminProducts = () => {
               </div>
 
               <div className="form-group">
-                <label>Image URL</label>
+                <label>Product Image</label>
                 <input
-                  type="url"
-                  name="image_url"
-                  value={formData.image_url}
-                  onChange={handleInputChange}
-                  required
+                  type="file"
+                  accept="image/*"
+                  onChange={handleImageChange}
+                  className="image-upload"
                 />
+                {imagePreview && (
+                  <div className="image-preview">
+                    <img src={imagePreview} alt="Preview" />
+                  </div>
+                )}
               </div>
 
               <div className="form-actions">
@@ -249,7 +309,7 @@ const AdminProducts = () => {
                 <tr key={product.id}>
                   <td>
                     <img 
-                      src={product.image_url} 
+                      src={`http://localhost:5000${product.image_url}`}
                       alt={product.name}
                       className="product-thumbnail"
                     />
