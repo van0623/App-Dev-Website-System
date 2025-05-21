@@ -2,11 +2,24 @@ const express = require('express');
 const bcrypt = require('bcrypt');
 const router = express.Router();
 const db = require('../config/db');
+const { authenticateToken } = require('../middleware/auth');
+
+// Apply authentication middleware to all user routes
+router.use(authenticateToken);
 
 // Update user password
 router.put('/:id/password', async (req, res) => {
   try {
     const userId = req.params.id;
+    
+    // Check if user is updating their own password
+    if (req.user.id !== parseInt(userId)) {
+      return res.status(403).json({ 
+        success: false, 
+        message: 'Not authorized to update this password' 
+      });
+    }
+    
     const { currentPassword, newPassword } = req.body;
     
     // Get current password hash
@@ -68,6 +81,15 @@ router.get('/:id', async (req, res) => {
 router.put('/:id', async (req, res) => {
   try {
     const userId = req.params.id;
+    
+    // Check if user is updating their own profile
+    if (req.user.id !== parseInt(userId)) {
+      return res.status(403).json({ 
+        success: false, 
+        message: 'Not authorized to update this profile' 
+      });
+    }
+    
     const { first_name, last_name, email, phone, address, city, zip_code } = req.body;
     
     console.log('Updating profile for user:', userId);

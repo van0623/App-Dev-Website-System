@@ -7,83 +7,98 @@ import axios from 'axios';
 import '../App.css';
 
 const CartPage = () => {
-  const { cart, setCart } = useCart();
+  const { cart, removeFromCart, updateQuantity, clearCart, isUpdating } = useCart();
   const { isAuthenticated } = useUser();
-  const { showSuccess, showError } = useNotification();
+  const { showError, showSuccess, showInfo } = useNotification();
   const navigate = useNavigate();
   const [showAuthOptions, setShowAuthOptions] = useState(false);
 
-  const handleQuantityChange = async (itemId, size, newQuantity) => {
-    if (newQuantity < 1) return;
+  const handleQuantityChange = async (productId, size, newQuantity, productName) => {
+    if (isUpdating) return;
 
     try {
       if (isAuthenticated) {
+        const token = localStorage.getItem('token');
+        if (!token) {
+          showError('Authentication token not found. Please login again.');
+          return;
+        }
+
         await axios.put('http://localhost:5000/api/cart/update', {
           userId: JSON.parse(localStorage.getItem('user')).id,
-          productId: itemId,
+          productId,
           size,
           quantity: newQuantity
+        }, {
+          headers: {
+            'Authorization': `Bearer ${token}`
+          }
         });
       }
 
-      const updatedCart = cart.map(item => {
-        if (item.id === itemId && item.size === size) {
-          return { ...item, quantity: newQuantity };
-        }
-        return item;
-      });
-      setCart(updatedCart);
+      updateQuantity(productId, size, newQuantity, productName);
     } catch (error) {
       console.error('Error updating quantity:', error);
-      showError('Failed to update quantity');
+      showError('Failed to update quantity. Please try again.');
     }
   };
 
-  const handleRemoveItem = async (itemId, size) => {
+  const handleRemoveItem = async (productId, size, productName) => {
+    if (isUpdating) return;
+
     try {
       if (isAuthenticated) {
+        const token = localStorage.getItem('token');
+        if (!token) {
+          showError('Authentication token not found. Please login again.');
+          return;
+        }
+
         await axios.delete('http://localhost:5000/api/cart/remove', {
+          headers: {
+            'Authorization': `Bearer ${token}`
+          },
           data: {
             userId: JSON.parse(localStorage.getItem('user')).id,
-            productId: itemId,
+            productId,
             size
           }
         });
       }
 
-      const updatedCart = cart.filter(item => !(item.id === itemId && item.size === size));
-      setCart(updatedCart);
-      showSuccess('Item removed from cart');
+      removeFromCart(productId, size, productName);
     } catch (error) {
       console.error('Error removing item:', error);
-      showError('Failed to remove item');
+      showError('Failed to remove item. Please try again.');
     }
   };
 
   const handleClearCart = async () => {
+    if (isUpdating) return;
+
     try {
       if (isAuthenticated) {
         await axios.delete(`http://localhost:5000/api/cart/clear/${JSON.parse(localStorage.getItem('user')).id}`);
       }
 
-      setCart([]);
-      showSuccess('Cart cleared');
+      clearCart();
     } catch (error) {
       console.error('Error clearing cart:', error);
-      showError('Failed to clear cart');
+      showError('Failed to clear cart. Please try again.');
     }
   };
 
   const handleProceedToCheckout = () => {
     if (!isAuthenticated) {
       setShowAuthOptions(true);
+      showInfo('Please sign in to proceed with checkout');
     } else {
       navigate('/checkout');
     }
   };
 
   const calculateSubtotal = () => {
-    return cart.reduce((total, item) => total + (item.price * item.quantity), 0);
+    return cart.reduce((total, item) => total + (Number(item.price) * Number(item.quantity)), 0);
   };
 
   const shipping = 10;
@@ -109,8 +124,12 @@ const CartPage = () => {
         <Link to="/" className="back-button">Back to Shopping</Link>
         <h1>Your Cart</h1>
         {cart.length > 0 && (
-          <button onClick={handleClearCart} className="clear-cart-button">
-            Clear Cart
+          <button 
+            onClick={handleClearCart} 
+            className="clear-cart-button"
+            disabled={isUpdating}
+          >
+            {isUpdating ? 'Clearing...' : 'Clear Cart'}
           </button>
         )}
       </div>
@@ -125,35 +144,45 @@ const CartPage = () => {
         <div className="cart-content">
           <div className="cart-items">
             {cart.map((item) => (
-              <div key={`${item.id}-${item.size}`} className="cart-item">
-                <img src={item.image} alt={item.name} className="item-image" />
+              <div key={`${item.product_id}-${item.size}`} className="cart-item">
+                <img 
+                  src={`http://localhost:5000${item.image_url}`} 
+                  alt={item.product_name} 
+                  className="item-image"
+                  onError={(e) => {
+                    e.target.src = '/placeholder.jpg';
+                    console.error('Failed to load image:', item.image_url);
+                  }}
+                />
                 <div className="item-details">
-                  <h3>{item.name}</h3>
+                  <h3>{item.product_name}</h3>
                   <p className="item-size">Size: {item.size}</p>
-                  <p className="item-price">${item.price}</p>
+                  <p className="item-price">₱{item.price}</p>
                   <div className="quantity-controls">
                     <button
-                      onClick={() => handleQuantityChange(item.id, item.size, item.quantity - 1)}
-                      disabled={item.quantity <= 1}
+                      onClick={() => handleQuantityChange(item.product_id, item.size, item.quantity - 1, item.product_name)}
+                      disabled={item.quantity <= 1 || isUpdating}
                     >
                       -
                     </button>
                     <span>{item.quantity}</span>
                     <button
-                      onClick={() => handleQuantityChange(item.id, item.size, item.quantity + 1)}
+                      onClick={() => handleQuantityChange(item.product_id, item.size, item.quantity + 1, item.product_name)}
+                      disabled={isUpdating}
                     >
                       +
                     </button>
                   </div>
                   <button
-                    onClick={() => handleRemoveItem(item.id, item.size)}
+                    onClick={() => handleRemoveItem(item.product_id, item.size, item.product_name)}
                     className="remove-item"
+                    disabled={isUpdating}
                   >
-                    Remove
+                    {isUpdating ? 'Removing...' : 'Remove'}
                   </button>
                 </div>
                 <div className="item-total">
-                  ₱{(item.price * item.quantity).toFixed(2)}
+                  ₱{(Number(item.price) * Number(item.quantity)).toFixed(2)}
                 </div>
               </div>
             ))}
@@ -176,8 +205,9 @@ const CartPage = () => {
             <button
               onClick={handleProceedToCheckout}
               className="checkout-button"
+              disabled={isUpdating}
             >
-              Proceed to Checkout
+              {isUpdating ? 'Processing...' : 'Proceed to Checkout'}
             </button>
           </div>
         </div>

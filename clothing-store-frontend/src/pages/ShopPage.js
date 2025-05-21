@@ -14,7 +14,7 @@ function ShopPage() {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('All');
   const [storeSettings, setStoreSettings] = useState(null);
-  const { addToCart } = useCart();
+  const { cart, getCartItemCount } = useCart() || {};
 
   // Fetch products from backend
   useEffect(() => {
@@ -90,8 +90,8 @@ function ShopPage() {
       </div>
       
       <div className="shop-header">
-        <h1>Our Collection</h1>
-        <p>Discover our faith-inspired clothing line</p>
+        <h1>Premium Streetwear Collection</h1>
+        <p>Discover our selection of authentic, brand new streetwear from top brands</p>
         
         {/* Search and Filter */}
         <div className="shop-filters">

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import { useUser } from '../context/UserContext';
 import { useNotification } from '../context/NotificationContext';
@@ -12,16 +12,16 @@ const AdminUsers = () => {
   const [filteredUsers, setFilteredUsers] = useState([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [filterRole, setFilterRole] = useState('all');
+  const [roleChangeModal, setRoleChangeModal] = useState({
+    isOpen: false,
+    userId: null,
+    newRole: null,
+    userName: '',
+    currentRole: ''
+  });
+  const [loadingStates, setLoadingStates] = useState({});
 
-  useEffect(() => {
-    fetchUsers();
-  }, []);
-
-  useEffect(() => {
-    filterUsers();
-  }, [users, searchTerm, filterRole]);
-
-  const fetchUsers = async () => {
+  const fetchUsers = useCallback(async () => {
     console.log('Fetching users...'); // Debug log
     try {
       const response = await axios.get('http://localhost:5000/api/admin/users');
@@ -32,9 +32,9 @@ const AdminUsers = () => {
       console.error('Error response:', error.response?.data); // Debug log
       showError('Failed to load users');
     }
-  };
+  }, [showError]);
 
-  const filterUsers = () => {
+  const filterUsers = useCallback(() => {
     let filtered = users;
 
     // Filter by role
@@ -52,26 +52,87 @@ const AdminUsers = () => {
     }
 
     setFilteredUsers(filtered);
+  }, [users, searchTerm, filterRole]);
+
+  useEffect(() => {
+    fetchUsers();
+  }, [fetchUsers]);
+
+  useEffect(() => {
+    filterUsers();
+  }, [filterUsers]);
+
+  const handleRoleChange = (userId, currentRole, newRole, userName) => {
+    // Prevent changing own role
+    if (userId === user.id) {
+      showError('You cannot change your own role');
+      return;
+    }
+
+    // Prevent changing role of the last admin
+    if (currentRole === 'admin' && newRole === 'customer') {
+      const adminCount = users.filter(u => u.role === 'admin').length;
+      if (adminCount <= 1) {
+        showError('Cannot remove the last admin user');
+        return;
+      }
+    }
+
+    setRoleChangeModal({
+      isOpen: true,
+      userId,
+      newRole,
+      userName,
+      currentRole
+    });
   };
 
-  const updateUserRole = async (userId, newRole) => {
+  const confirmRoleChange = async () => {
+    const { userId, newRole, userName } = roleChangeModal;
+    
+    setLoadingStates(prev => ({ ...prev, [userId]: true }));
+    
     try {
       await axios.put(`http://localhost:5000/api/admin/users/${userId}/role`, {
         role: newRole
       });
-      showSuccess('User role updated successfully!');
-      fetchUsers();
+      
+      showSuccess(`Successfully updated ${userName}'s role to ${newRole}`);
+      await fetchUsers();
     } catch (error) {
       console.error('Error updating user role:', error);
-      showError('Error updating user role');
+      showError(error.response?.data?.message || 'Error updating user role');
+    } finally {
+      setLoadingStates(prev => ({ ...prev, [userId]: false }));
+      setRoleChangeModal({ isOpen: false, userId: null, newRole: null, userName: '', currentRole: '' });
     }
   };
 
-  const deleteUser = async (userId) => {
-    if (window.confirm('Are you sure you want to delete this user?')) {
+  const cancelRoleChange = () => {
+    setRoleChangeModal({ isOpen: false, userId: null, newRole: null, userName: '', currentRole: '' });
+  };
+
+  const deleteUser = async (userId, userName) => {
+    // Prevent deleting own account
+    if (userId === user.id) {
+      showError('You cannot delete your own account');
+      return;
+    }
+
+    // Prevent deleting the last admin
+    const userToDelete = users.find(u => u.id === userId);
+    if (userToDelete?.role === 'admin') {
+      const adminCount = users.filter(u => u.role === 'admin').length;
+      if (adminCount <= 1) {
+        showError('Cannot delete the last admin user');
+        return;
+      }
+    }
+
+    if (window.confirm(`Are you sure you want to delete ${userName}'s account?`)) {
       try {
         await axios.delete(`http://localhost:5000/api/admin/users/${userId}`);
-        showSuccess('User deleted successfully!');
+        showSuccess(`Successfully deleted ${userName}'s account`);
         fetchUsers();
       } catch (error) {
         console.error('Error deleting user:', error);
@@ -140,8 +201,14 @@ const AdminUsers = () => {
                   <td>
                     <select
                       value={userData.role}
-                      onChange={(e) => updateUserRole(userData.id, e.target.value)}
-                      className={`role-select ${userData.role}`}
+                      onChange={(e) => handleRoleChange(
+                        userData.id,
+                        userData.role,
+                        e.target.value,
+                        `${userData.first_name} ${userData.last_name}`
+                      )}
+                      className={`role-select ${userData.role} ${loadingStates[userData.id] ? 'loading' : ''}`}
+                      disabled={loadingStates[userData.id]}
                     >
                       <option value="customer">Customer</option>
                       <option value="admin">Admin</option>
@@ -150,9 +217,9 @@ const AdminUsers = () => {
                   <td>{new Date(userData.created_at).toLocaleDateString()}</td>
                   <td>
                     <button 
-                      onClick={() => deleteUser(userData.id)}
+                      onClick={() => deleteUser(userData.id, `${userData.first_name} ${userData.last_name}`)}
                       className="btn btn-sm btn-danger"
-                      disabled={userData.id === user.id}
+                      disabled={userData.id === user.id || loadingStates[userData.id]}
                     >
                       Delete
                     </button>
@@ -178,6 +245,40 @@ const AdminUsers = () => {
           </div>
         </div>
       </div>
+
+      {/* Role Change Confirmation Modal */}
+      {roleChangeModal.isOpen && (
+        <div className="role-confirm-modal">
+          <div className="role-confirm-content">
+            <div className="role-confirm-header">
+              <h3>Confirm Role Change</h3>
+            </div>
+            <div className="role-confirm-body">
+              <p>
+                Are you sure you want to change {roleChangeModal.userName}'s role from{' '}
+                <strong>{roleChangeModal.currentRole}</strong> to{' '}
+                <strong>{roleChangeModal.newRole}</strong>?
+              </p>
+            </div>
+            <div className="role-confirm-actions">
+              <button 
+                className="role-confirm-btn cancel"
+                onClick={cancelRoleChange}
+                disabled={loadingStates[roleChangeModal.userId]}
+              >
+                Cancel
+              </button>
+              <button 
+                className="role-confirm-btn confirm"
+                onClick={confirmRoleChange}
+                disabled={loadingStates[roleChangeModal.userId]}
+              >
+                {loadingStates[roleChangeModal.userId] ? 'Updating...' : 'Confirm Change'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

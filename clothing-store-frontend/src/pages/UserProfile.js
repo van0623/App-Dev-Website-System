@@ -5,7 +5,7 @@ import axios from 'axios';
 import '../App.css';
 
 const UserProfile = () => {
-  const { user, setUser, logout, refreshUser } = useUser();
+  const { user, logout, refreshUser, isLoading: contextLoading } = useUser();
   const navigate = useNavigate();
   const [isEditing, setIsEditing] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -35,7 +35,7 @@ const UserProfile = () => {
   }, [refreshUser]);
 
   useEffect(() => {
-    if (user) {
+    if (user && !isEditing) {
       setFormData({
         first_name: user.first_name || '',
         last_name: user.last_name || '',
@@ -46,13 +46,14 @@ const UserProfile = () => {
         zip_code: user.zip_code || ''
       });
     }
-  }, [user]);
+  }, [user, isEditing]);
 
   const handleInputChange = (e) => {
-    setFormData({
-      ...formData,
-      [e.target.name]: e.target.value
-    });
+    const { name, value } = e.target;
+    setFormData(prevData => ({
+      ...prevData,
+      [name]: value
+    }));
   };
 
   const handlePasswordChange = (e) => {
@@ -68,21 +69,18 @@ const UserProfile = () => {
     setError('');
     setSuccess('');
 
-    console.log('Updating profile for user:', user.id);
-    console.log('Form data:', formData);
-
     try {
-      const response = await axios.put(`http://localhost:5000/api/users/${user.id}`, {
-        first_name: formData.first_name,
-        last_name: formData.last_name,
-        email: formData.email,
-        phone: formData.phone,
-        address: formData.address,
-        city: formData.city,
-        zip_code: formData.zip_code
+      const token = localStorage.getItem('token');
+      if (!token) {
+        setError('Authentication token not found. Please login again.');
+        return;
+      }
+
+      const response = await axios.put(`http://localhost:5000/api/users/${user.id}`, formData, {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
       });
-      
-      console.log('Profile update response:', response.data);
       
       if (response.data.success) {
         await refreshUser();
@@ -90,8 +88,8 @@ const UserProfile = () => {
         setIsEditing(false);
       }
     } catch (error) {
-      console.error('Profile update error details:', error.response?.data || error.message);
-      setError('Failed to update profile. Please try again.');
+      console.error('Profile update error:', error);
+      setError(error.response?.data?.message || 'Failed to update profile. Please try again.');
     } finally {
       setLoading(false);
     }
@@ -116,9 +114,19 @@ const UserProfile = () => {
     }
 
     try {
+      const token = localStorage.getItem('token');
+      if (!token) {
+        setError('Authentication token not found. Please login again.');
+        return;
+      }
+
       const response = await axios.put(`http://localhost:5000/api/users/${user.id}/password`, {
         currentPassword: passwordData.currentPassword,
         newPassword: passwordData.newPassword
+      }, {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
       });
       
       if (response.data.success) {
@@ -136,6 +144,21 @@ const UserProfile = () => {
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleCancelEdit = () => {
+    if (user) {
+      setFormData({
+        first_name: user.first_name || '',
+        last_name: user.last_name || '',
+        email: user.email || '',
+        phone: user.phone || '',
+        address: user.address || '',
+        city: user.city || '',
+        zip_code: user.zip_code || ''
+      });
+    }
+    setIsEditing(false);
   };
 
   if (!user) {
@@ -164,6 +187,10 @@ const UserProfile = () => {
           <h1>My Profile</h1>
         </div>
 
+        {(contextLoading || loading) && (
+          <div className="loading-message">Loading...</div>
+        )}
+        
         {error && <div className="error-message">{error}</div>}
         {success && <div className="success-message">{success}</div>}
 
@@ -226,7 +253,7 @@ const UserProfile = () => {
                       type="text"
                       id="first_name"
                       name="first_name"
-                      value={formData.first_name}
+                      value={formData.first_name || ''}
                       onChange={handleInputChange}
                       required
                     />
@@ -237,7 +264,7 @@ const UserProfile = () => {
                       type="text"
                       id="last_name"
                       name="last_name"
-                      value={formData.last_name}
+                      value={formData.last_name || ''}
                       onChange={handleInputChange}
                       required
                     />
@@ -250,7 +277,7 @@ const UserProfile = () => {
                     type="email"
                     id="email"
                     name="email"
-                    value={formData.email}
+                    value={formData.email || ''}
                     onChange={handleInputChange}
                     required
                   />
@@ -262,7 +289,7 @@ const UserProfile = () => {
                     type="tel"
                     id="phone"
                     name="phone"
-                    value={formData.phone}
+                    value={formData.phone || ''}
                     onChange={handleInputChange}
                   />
                 </div>
@@ -273,7 +300,7 @@ const UserProfile = () => {
                     type="text"
                     id="address"
                     name="address"
-                    value={formData.address}
+                    value={formData.address || ''}
                     onChange={handleInputChange}
                   />
                 </div>
@@ -285,7 +312,7 @@ const UserProfile = () => {
                       type="text"
                       id="city"
                       name="city"
-                      value={formData.city}
+                      value={formData.city || ''}
                       onChange={handleInputChange}
                     />
                   </div>
@@ -295,7 +322,7 @@ const UserProfile = () => {
                       type="text"
                       id="zip_code"
                       name="zip_code"
-                      value={formData.zip_code}
+                      value={formData.zip_code || ''}
                       onChange={handleInputChange}
                     />
                   </div>
@@ -311,7 +338,7 @@ const UserProfile = () => {
                   </button>
                   <button
                     type="button"
-                    onClick={() => setIsEditing(false)}
+                    onClick={handleCancelEdit}
                     className="btn btn-secondary"
                   >
                     Cancel

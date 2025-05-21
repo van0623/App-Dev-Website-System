@@ -57,6 +57,9 @@ const LoginPage = () => {
       });
 
       if (response.data.success) {
+        // Store the token for all users
+        localStorage.setItem('token', response.data.token);
+        
         // Login successful - pass the correct user data with role
         const userData = {
           id: response.data.user.id,
@@ -69,6 +72,13 @@ const LoginPage = () => {
           city: response.data.user.city,
           zip_code: response.data.user.zip_code
         };
+        
+        // Store admin token if user is admin
+        if (response.data.user.role === 'admin') {
+          localStorage.setItem('adminToken', response.data.token);
+        } else {
+          localStorage.removeItem('adminToken');
+        }
         
         console.log('Login successful, user data:', userData); 
         
@@ -129,7 +139,15 @@ const LoginPage = () => {
               <input type="checkbox" />
               Remember me
             </label>
-            <a href="#" className="forgot-password">Forgot password?</a>
+            <div className="form-group">
+              <button 
+                type="button" 
+                className="forgot-password"
+                onClick={() => navigate('/forgot-password')}
+              >
+                Forgot password?
+              </button>
+            </div>
           </div>
 
           <button 

@@ -50,17 +50,26 @@ function ProductDetailPage() {
       return;
     }
 
+    if (!product || !product.id) {
+      setError('Invalid product data');
+      return;
+    }
+
     const productToAdd = {
       id: product.id,
+      productId: product.id,
       name: product.name,
+      productName: product.name,
       price: product.price,
       size: selectedSize,
       quantity: quantity,
-      image: product.image_url
+      image: product.image_url,
+      imageUrl: product.image_url
     };
 
-    // Pass user ID if authenticated
-    addToCart(productToAdd, user?.id);
+    console.log('Adding to cart:', productToAdd);
+
+    addToCart(productToAdd);
     setSuccess(`${product.name} added to cart!`);
     
     // Clear success message after 3 seconds

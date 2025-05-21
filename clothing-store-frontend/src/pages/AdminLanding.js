@@ -44,7 +44,7 @@ const AdminLanding = () => {
                 <div className="choice-icon">👕</div>
                 <h2>Products</h2>
               </div>
-              <p>Manage your product inventory and categories</p>
+              <p>Manage your product inventory</p>
               <div className="choice-stats">
                 <span>Product management</span>
               </div>

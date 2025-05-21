@@ -228,13 +228,14 @@ import { useNotification } from '../context/NotificationContext';
 
 const CheckoutPage = () => {
   const navigate = useNavigate();
-  const { showError } = useNotification();
+  const { showError, showSuccess } = useNotification();
   
   const { cart = [], clearCart, getCartTotal, getCartItemCount } = useCart() || {};
   const { isAuthenticated, user } = useUser() || {};
   
   const [orderPlaced, setOrderPlaced] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
   const [formData, setFormData] = useState({
     paymentMethod: 'cash-on-delivery'
   });
@@ -245,7 +246,6 @@ const CheckoutPage = () => {
     console.log('CheckoutPage - Cart:', cart);
   }, [user, cart]);
 
-  // Calculate shipping based on total
   const calculateShipping = () => {
     const total = getCartTotal ? getCartTotal() : 0;
     return total >= 2000 ? 0 : 100;
@@ -263,46 +263,81 @@ const CheckoutPage = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
-
-    if (!isAuthenticated || !user) {
-      showError('Please log in to place your order.');
-      navigate('/login');
-      return;
-    }
-
-    if (!cart.length) {
-      showError('Your cart is empty.');
-      navigate('/cart');
-      return;
-    }
+    setError('');
 
     try {
-      const response = await axios.post('http://localhost:5000/api/orders/create', {
-        userId: user.id,
-        cartItems: cart,
-        totalAmount: getFinalTotal(),
-        shippingAmount: calculateShipping(),
-        taxAmount: calculateTax(),
-        shippingInfo: {
-          firstName: user.first_name || '',
-          lastName: user.last_name || '',
-          email: user.email || '',
-          phone: user.phone || '',
-          address: user.address || '',
-          city: user.city || '',
-          zipCode: user.zip_code || ''
+      // Validate user data
+      if (!user.address || !user.city || !user.zip_code) {
+        throw new Error('Please complete your shipping information in your profile before placing an order.');
+      }
+
+      // Log cart data first
+      console.log('Cart data before processing:', cart);
+
+      // Prepare order data
+      const orderData = {
+        user_id: user.id,
+        items: cart.map(item => {
+          // Ensure all required fields are present
+          if (!item.product_id || !item.product_name || !item.price || !item.size || !item.quantity) {
+            throw new Error(`Invalid item data: ${JSON.stringify(item)}`);
+          }
+
+          const processedItem = {
+            product_id: item.product_id,
+            product_name: item.product_name,
+            price: Number(item.price),
+            size: item.size,
+            quantity: Number(item.quantity),
+            image_url: item.image_url || null
+          };
+          console.log('Processed item:', processedItem);
+          return processedItem;
+        }),
+        shipping_address: {
+          address: user.address,
+          city: user.city,
+          zipCode: user.zip_code
+        },
+        total_amount: Number(getFinalTotal()),
+        shipping_amount: Number(calculateShipping()),
+        tax_amount: Number(calculateTax()),
+        payment_method: 'cash-on-delivery'
+      };
+
+      // Log the complete order data
+      console.log('Complete order data being sent:', JSON.stringify(orderData, null, 2));
+
+      // Create order
+      const token = localStorage.getItem('token');
+      if (!token) {
+        throw new Error('Authentication token not found. Please login again.');
+      }
+
+      const response = await axios.post('http://localhost:5000/api/orders/create', orderData, {
+        headers: {
+          'Authorization': `Bearer ${token}`
         }
       });
+      console.log('Order creation response:', response.data);
 
       if (response.data.success) {
-        setOrderPlaced(true);
+        showSuccess('Order placed successfully!');
         clearCart();
+        setOrderPlaced(true);
+        navigate(`/order-confirmation/${response.data.orderId}`);
       } else {
-        showError('Failed to place order. Please try again.');
+        throw new Error(response.data.message || 'Failed to create order');
       }
     } catch (error) {
       console.error('Error creating order:', error);
-      showError('Failed to place order. Please try again.');
+      console.error('Error details:', {
+        message: error.message,
+        response: error.response?.data,
+        status: error.response?.status
+      });
+      setError(error.response?.data?.message || error.message || 'Failed to place order. Please try again.');
+      showError(error.response?.data?.message || error.message || 'Failed to place order. Please try again.');
     } finally {
       setLoading(false);
     }
@@ -341,40 +376,41 @@ const CheckoutPage = () => {
     );
   }
 
-  if (orderPlaced) {
-    return (
-      <div className="checkout-page">
-        <div className="container">
-          <button onClick={() => navigate('/shop')} className="back-button">Back to Shop</button>
-          <div className="order-success">
-            <h1>Order Placed Successfully!</h1>
-            <p>Thank you for your purchase. Your order confirmation will be sent to your email.</p>
-            <p>You will pay <strong>₱{getFinalTotal().toLocaleString()}</strong> when your order is delivered.</p>
-            <div className="success-actions">
-              <Link to="/shop" className="btn btn-primary">Continue Shopping</Link>
-              <Link to="/" className="btn btn-secondary">Go to Home</Link>
-            </div>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
   return (
     <div className="checkout-page">
       <div className="container">
         <button onClick={() => navigate('/cart')} className="back-button">Back to Cart</button>
         <h1>Checkout</h1>
+        
+        {error && (
+          <div className="error-message">
+            {error}
+          </div>
+        )}
+
         <div className="checkout-content">
           <div className="checkout-form">
-            <h2>Shipping Information</h2>
+            <div className="shipping-info-header">
+              <h2>Shipping Information</h2>
+              <Link to="/profile" className="edit-profile-link">
+                Edit Profile Information
+              </Link>
+            </div>
+            
             <div className="shipping-info-display">
-              <p><strong>Name:</strong> {user.first_name} {user.last_name}</p>
-              <p><strong>Email:</strong> {user.email}</p>
-              <p><strong>Phone:</strong> {user.phone || 'Not provided'}</p>
-              <p><strong>Address:</strong> {user.address || 'Not provided'}</p>
-              <p><strong>City:</strong> {user.city || 'Not provided'}</p>
-              <p><strong>ZIP Code:</strong> {user.zip_code || 'Not provided'}</p>
+              <div className="info-section">
+                <h3>Contact Information</h3>
+                <p><strong>Name:</strong> {user.first_name} {user.last_name}</p>
+                <p><strong>Email:</strong> {user.email}</p>
+                <p><strong>Phone:</strong> {user.phone || 'Not provided'}</p>
+              </div>
+              
+              <div className="info-section">
+                <h3>Shipping Address</h3>
+                <p><strong>Address:</strong> {user.address || 'Not provided'}</p>
+                <p><strong>City:</strong> {user.city || 'Not provided'}</p>
+                <p><strong>ZIP Code:</strong> {user.zip_code || 'Not provided'}</p>
+              </div>
             </div>
 
             <form onSubmit={handleSubmit}>
@@ -386,11 +422,6 @@ const CheckoutPage = () => {
                     <p>Pay when your order is delivered to your doorstep</p>
                   </div>
                 </div>
-                <input
-                  type="hidden"
-                  name="paymentMethod"
-                  value="cash-on-delivery"
-                />
               </div>
 
               <div className="checkout-actions">
@@ -398,7 +429,7 @@ const CheckoutPage = () => {
                 <button 
                   type="submit" 
                   className="btn btn-primary"
-                  disabled={loading}
+                  disabled={loading || !user.address || !user.city || !user.zip_code}
                 >
                   {loading ? 'Processing...' : 'Place Order'}
                 </button>
@@ -409,15 +440,22 @@ const CheckoutPage = () => {
           <div className="order-summary">
             <h2>Order Summary</h2>
             {cart.map((item) => (
-              <div key={`${item.id}-${item.size}`} className="checkout-item">
-                <img src={item.image} alt={item.name} />
+              <div key={`${item.product_id}-${item.size}`} className="checkout-item">
+                <img 
+                  src={`http://localhost:5000${item.image_url}`} 
+                  alt={item.product_name}
+                  onError={(e) => {
+                    e.target.src = '/placeholder.jpg';
+                    console.error('Failed to load image:', item.image_url);
+                  }}
+                />
                 <div className="item-details">
-                  <h4>{item.name}</h4>
+                  <h4>{item.product_name}</h4>
                   <p>Size: {item.size}</p>
                   <p>Quantity: {item.quantity}</p>
                 </div>
                 <div className="item-price">
-                  ₱{(item.price * item.quantity).toLocaleString()}
+                  ₱{(Number(item.price) * Number(item.quantity)).toLocaleString()}
                 </div>
               </div>
             ))}

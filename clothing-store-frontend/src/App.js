@@ -12,6 +12,7 @@ import LoginPage from './pages/LoginPage';
 import RegisterPage from './pages/RegisterPage';
 import OrderHistory from './pages/OrderHistory';
 import OrderDetail from './pages/OrderDetail';
+import OrderConfirmation from './pages/OrderConfirmation';
 import UserProfile from './pages/UserProfile';
 
 // Admin Pages
@@ -45,8 +46,8 @@ function App() {
   return (
     <Router>
       <UserProvider>
-        <CartProvider>
-          <NotificationProvider>
+        <NotificationProvider>
+          <CartProvider>
             <SettingsProvider>
               <div className="App">
                 <Routes>
@@ -72,13 +73,14 @@ function App() {
                     <Route path="register" element={<RegisterPage />} />
                     <Route path="order-history" element={<OrderHistory />} />
                     <Route path="order/:id" element={<OrderDetail />} />
+                    <Route path="order-confirmation/:id" element={<OrderConfirmation />} />
                     <Route path="profile" element={<UserProfile />} />
                   </Route>
                 </Routes>
               </div>
             </SettingsProvider>
-          </NotificationProvider>
-        </CartProvider>
+          </CartProvider>
+        </NotificationProvider>
       </UserProvider>
     </Router>
   );

@@ -5,6 +5,28 @@ const upload = require('../middleware/upload');
 const path = require('path');
 const fs = require('fs');
 
+// Get featured products (public)
+router.get('/featured', async (req, res) => {
+  try {
+    const [featuredProducts] = await db.query(`
+      SELECT 
+        p.id as product_id,
+        p.name,
+        p.price,
+        p.image_url,
+        p.description,
+        p.category
+      FROM featured_products fp
+      INNER JOIN products p ON fp.product_id = p.id
+      ORDER BY fp.created_at DESC
+    `);
+    res.json(featuredProducts);
+  } catch (error) {
+    console.error('Error fetching featured products:', error);
+    res.status(500).json({ message: 'Error fetching featured products' });
+  }
+});
+
 // Get all products
 router.get('/', async (req, res) => {
   try {

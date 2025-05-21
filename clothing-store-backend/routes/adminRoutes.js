@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const db = require('../config/db');
+const { auth } = require('../middleware/auth');
 
 // Get admin dashboard stats
 router.get('/stats', async (req, res) => {
@@ -160,4 +161,4 @@ router.delete('/users/:id', async (req, res) => {
   }
 });
 
-module.exports = router;
+module.exports = router; 
